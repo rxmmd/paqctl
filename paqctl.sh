@@ -264,6 +264,11 @@ check_dependencies() {
         esac
     fi
 
+    # openssl is required for GFK certificate generation
+    if ! command -v openssl &>/dev/null; then
+        install_package openssl || log_warn "Could not install openssl"
+    fi
+
     # libpcap is required by paqet
     install_libpcap
 }
@@ -1497,6 +1502,10 @@ generate_gfk_certs() {
         log_info "GFW-knocker certificates already exist"
         return 0
     fi
+    if ! command -v openssl &>/dev/null; then
+        log_info "Installing openssl..."
+        install_package openssl || { log_error "Failed to install openssl"; return 1; }
+    fi
     log_info "Generating QUIC TLS certificates..."
     if ! openssl req -x509 -newkey rsa:2048 -keyout "$GFK_DIR/key.pem" \
         -out "$GFK_DIR/cert.pem" -days 3650 -nodes -subj "/CN=gfk" 2>/dev/null; then
@@ -2475,6 +2484,16 @@ download_gfk() {
 
 generate_gfk_certs() {
     [ -f "$GFK_DIR/cert.pem" ] && [ -f "$GFK_DIR/key.pem" ] && return 0
+    if ! command -v openssl &>/dev/null; then
+        log_info "Installing openssl..."
+        if command -v apt-get &>/dev/null; then apt-get install -y openssl 2>/dev/null
+        elif command -v dnf &>/dev/null; then dnf install -y openssl 2>/dev/null
+        elif command -v yum &>/dev/null; then yum install -y openssl 2>/dev/null
+        elif command -v apk &>/dev/null; then apk add openssl 2>/dev/null
+        elif command -v pacman &>/dev/null; then pacman -S --noconfirm openssl 2>/dev/null
+        fi
+        command -v openssl &>/dev/null || { log_error "Failed to install openssl"; return 1; }
+    fi
     log_info "Generating QUIC certificates..."
     openssl req -x509 -newkey rsa:2048 -keyout "$GFK_DIR/key.pem" \
         -out "$GFK_DIR/cert.pem" -days 3650 -nodes -subj "/CN=gfk" 2>/dev/null || return 1
