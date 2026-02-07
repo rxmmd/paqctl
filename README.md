@@ -197,7 +197,7 @@ paqctl به صورت خودکار SOCKS5 را روی پورت آزاد بعدی 
 این دستور را روی VPS خود اجرا کنید (نیاز به root دارد):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SamNet-dev/paqctl/main/paqctl.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/rxmmd/paqctl/main/paqctl.sh | sudo bash
 ```
 
 سپس منوی تعاملی را باز کنید:
