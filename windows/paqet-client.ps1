@@ -741,6 +741,16 @@ function Get-ClientStatus {
     Write-Host ""
 }
 
+function Show-Logs {
+    $logFile = "$GfkDir\gfk.log"
+    if (Test-Path $logFile) {
+        Write-Host "Showing logs (Ctrl+C to stop)..." -ForegroundColor Cyan
+        Get-Content $logFile -Wait -Tail 50
+    } else {
+        Write-Warn "No logs found at $logFile"
+    }
+}
+
 #═══════════════════════════════════════════════════════════════════════
 # Update Function
 #═══════════════════════════════════════════════════════════════════════
@@ -948,7 +958,9 @@ function Show-Menu {
         Write-Host "  5. Stop client"
         Write-Host "  6. Show status"
         Write-Host "  7. Update paqet"
-        Write-Host "  8. About (how it works)"
+        Write-Host "  8. Monitor Real-time (GFK)"
+        Write-Host "  9. View Logs"
+        Write-Host "  10. About (how it works)"
         Write-Host "  0. Exit"
         Write-Host ""
 
@@ -1029,7 +1041,17 @@ function Show-Menu {
             "5" { Stop-Client }
             "6" { Get-ClientStatus }
             "7" { Update-Paqet }
-            "8" { Show-About }
+            "8" { 
+                if ($backend -eq "gfk") {
+                    Set-Location $GfkDir
+                    & python monitor.py
+                    Pop-Location
+                } else {
+                    Write-Warn "Monitoring only available for GFK"
+                }
+            }
+            "9" { Show-Logs }
+            "10" { Show-About }
             "0" { return }
             default { Write-Warn "Invalid option" }
         }

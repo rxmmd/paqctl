@@ -1,9 +1,12 @@
-from scapy.all import AsyncSniffer,IP,TCP,Raw,conf
+from scapy.all import AsyncSniffer, IP, TCP, Raw, conf
 import asyncio
 import random
 import parameters
 import logging
 import time
+import socket
+import struct
+import os
 
 
 
@@ -90,19 +93,43 @@ async def forward_vio_to_quic(qu1, transport):
 
 
 
-basepkt = IP(src=vps_ip) / TCP(sport=vio_tcp_server_port, seq=1, flags=tcp_flags, ack=0, options=tcp_options) / Raw(load=b"")
+class FastPacketBuilder:
+    def __init__(self):
+        self.src_ip = socket.inet_aton(vps_ip)
 
+    def build_packet(self, data, dst_ip_str, dst_port):
+        # Add random padding for hardening (0 to 32 bytes)
+        padding_len = random.randint(0, 32)
+        padding = os.urandom(padding_len)
+        payload = data + padding
+        
+        # Calculate lengths
+        ip_total_len = 20 + 20 + len(payload)
+        
+        # IP Header
+        dst_ip_bin = socket.inet_aton(dst_ip_str)
+        ip_header = struct.pack('!BBHHHBBH4s4s',
+            0x45, 0, ip_total_len, random.randint(1, 65535), 0x4000, 64, socket.IPPROTO_TCP, 0, self.src_ip, dst_ip_bin)
+        
+        # TCP Header
+        flags = 0x18  # ACK + PSH by default
+        if random.random() < 0.1: flags = 0x10 # Just ACK
+        
+        tcp_header = struct.pack('!HHIIBBHHH',
+            vio_tcp_server_port, dst_port, random.randint(1024, 4294967295), 
+            random.randint(1024, 4294967295), 0x50, flags, 8192, 0, 0)
+        
+        return ip_header + tcp_header + payload
+
+packet_builder = FastPacketBuilder()
 skt = conf.L3socket()
 
-def send_to_violated_TCP(binary_data,client_ip,client_port):
-    # logger.info(f"client ip = {client_ip}")
-    new_pkt = basepkt.copy()
-    new_pkt[IP].dst = client_ip
-    new_pkt[TCP].dport = client_port
-    new_pkt[TCP].seq = random.randint(1024,1048576)
-    new_pkt[TCP].ack = random.randint(1024,1048576)
-    new_pkt[TCP].load = binary_data
-    skt.send(new_pkt)
+def send_to_violated_TCP(binary_data, target_ip, target_port):
+    try:
+        raw_packet = packet_builder.build_packet(binary_data, target_ip, target_port)
+        skt.send(raw_packet)
+    except Exception as e:
+        logger.error(f"Error sending server packet: {e}")
 
 
 

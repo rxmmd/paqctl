@@ -8,8 +8,47 @@ from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import ConnectionTerminated, StreamDataReceived, StreamReset
 import parameters
 
-logging.basicConfig(level=logging.INFO)
+import json
+import os
+
+# Setup logging to both file and console
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_file = "gfk.log"
+
+file_handler = logging.FileHandler(log_file)
+file_handler.setFormatter(log_formatter)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
 logger = logging.getLogger("QuicClient")
+
+class QuicStats:
+    def __init__(self):
+        self.rx_bytes = 0
+        self.tx_bytes = 0
+        self.active_tcp = 0
+        self.active_udp = 0
+        self.start_time = time.time()
+
+    def update_file(self):
+        stats = {
+            "rx_mb": round(self.rx_bytes / (1024 * 1024), 2),
+            "tx_mb": round(self.tx_bytes / (1024 * 1024), 2),
+            "tcp_count": self.active_tcp,
+            "udp_count": self.active_udp,
+            "uptime": int(time.time() - self.start_time)
+        }
+        with open("gfk_stats.json", "w") as f:
+            json.dump(stats, f)
+
+stats = QuicStats()
+
+async def stats_pusher():
+    while True:
+        stats.update_file()
+        await asyncio.sleep(2)
 
 active_protocols = []
 is_quic_established = False
@@ -31,6 +70,7 @@ class TunnelClientProtocol(QuicConnectionProtocol):
         active_protocols.append(self)
         asyncio.create_task(self.cleanup_stale_udp_connections())
         asyncio.create_task(self.check_start_connectivity())
+        asyncio.create_task(stats_pusher())
 
     async def check_start_connectivity(self):
         global is_quic_established
@@ -93,20 +133,20 @@ class TunnelClientProtocol(QuicConnectionProtocol):
             logger.info(f"Error closing stream at client: {e}")
 
         try:
-            if stream_id in self.tcp_connections:
-                try:
-                    writer = self.tcp_connections[stream_id][1]
-                    writer.close()
-                    del self.tcp_connections[stream_id]
-                except Exception as e:
-                    logger.info(f"Error closing tcp estblsh at client: {e}")
-            if stream_id in self.tcp_syn_wait:
                 try:
                     writer = self.tcp_syn_wait[stream_id][1]
                     writer.close()
                     del self.tcp_syn_wait[stream_id]
                 except Exception as e:
                     logger.info(f"Error closing tcp syn at client: {e}")
+            if stream_id in self.tcp_connections:
+                try:
+                    writer = self.tcp_connections[stream_id][1]
+                    writer.close()
+                    del self.tcp_connections[stream_id]
+                    stats.active_tcp -= 1
+                except Exception as e:
+                    logger.info(f"Error closing tcp estblsh at client: {e}")
             if stream_id in self.udp_stream_to_addr:
                 try:
                     addr = self.udp_stream_to_addr.get(stream_id)
@@ -114,6 +154,7 @@ class TunnelClientProtocol(QuicConnectionProtocol):
                     del self.udp_stream_to_addr[stream_id]
                     del self.udp_last_activity[stream_id]
                     del self.udp_stream_to_transport[stream_id]
+                    stats.active_udp -= 1
                 except Exception as e:
                     logger.info(f"Error closing udp at client: {e}")
         except Exception as e:
@@ -141,9 +182,9 @@ class TunnelClientProtocol(QuicConnectionProtocol):
             del self.tcp_syn_wait[stream_id]
 
             while True:
-                data = await reader.read(4096)
                 if not data:
                     break
+                stats.tx_bytes += len(data)
                 self._quic.send_stream_data(stream_id=stream_id, data=data, end_stream=False)
                 self.transmit()
 
@@ -207,6 +248,7 @@ class TunnelClientProtocol(QuicConnectionProtocol):
             req_data = parameters.quic_auth_code + "connect,udp," + str(udp_protocol.target_port) + ",!###!"
             self._quic.send_stream_data(stream_id=stream_id, data=req_data.encode("utf-8"), end_stream=False)
             self.transmit()
+            stats.active_udp += 1
             return stream_id
         except Exception as e:
             logger.info(f"Client Error creating new udp stream: {e}")
@@ -227,10 +269,12 @@ class TunnelClientProtocol(QuicConnectionProtocol):
                 elif event.stream_id in self.udp_stream_to_addr:
                     addr = self.udp_stream_to_addr[event.stream_id]
                     transport = self.udp_stream_to_transport[event.stream_id]
+                    stats.rx_bytes += len(event.data)
                     transport.sendto(event.data, addr)
 
                 elif event.stream_id in self.tcp_syn_wait:
                     if event.data == (parameters.quic_auth_code + "i am ready,!###!").encode("utf-8"):
+                        stats.active_tcp += 1
                         asyncio.create_task(self.forward_tcp_to_quic(event.stream_id))
                 else:
                     logger.warning("unknown Data arrived to client")

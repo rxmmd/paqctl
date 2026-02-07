@@ -1,9 +1,11 @@
-from scapy.all import AsyncSniffer,IP,TCP,Raw,conf,Ether,get_if_hwaddr
 import asyncio
 import random
 import parameters
 import logging
 import os
+import socket
+import struct
+from scapy.all import AsyncSniffer, IP, TCP, Raw, conf, Ether, get_if_hwaddr
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VioClient")
@@ -72,23 +74,59 @@ async def forward_vio_to_quic(qu1, transport):
         logger.info(f"Task vio to Quic Ended.")
 
 
-# Build base packet based on OS
-if is_windows and gateway_mac and my_ip and local_mac:
-    logger.info(f"Windows mode: using Ethernet frames (gw_mac={gateway_mac}, my_ip={my_ip})")
-    basepkt = Ether(dst=gateway_mac, src=local_mac) / IP(src=my_ip, dst=vps_ip) / TCP(sport=vio_tcp_client_port, dport=vio_tcp_server_port, seq=0, flags=tcp_flags, ack=0, options=tcp_options) / Raw(load=b"")
-    skt = conf.L2socket(iface=conf.iface)
-else:
-    logger.info(f"Linux mode: using L3 socket")
-    basepkt = IP(dst=vps_ip) / TCP(sport=vio_tcp_client_port, dport=vio_tcp_server_port, seq=0, flags=tcp_flags, ack=0, options=tcp_options) / Raw(load=b"")
-    skt = conf.L3socket()
+class FastPacketBuilder:
+    def __init__(self):
+        self.is_windows = os.name == 'nt'
+        self.local_mac = None
+        if self.is_windows:
+            try:
+                self.local_mac = bytes.fromhex(get_if_hwaddr(conf.iface).replace(':', '').replace('-', ''))
+                self.gateway_mac = bytes.fromhex(gateway_mac.replace(':', '').replace('-', ''))
+            except:
+                self.local_mac = None
+        
+        self.src_ip = socket.inet_aton(my_ip) if my_ip else b'\x00\x00\x00\x00'
+        self.dst_ip = socket.inet_aton(vps_ip)
+        self.src_port = vio_tcp_client_port
+        self.dst_port = vio_tcp_server_port
 
+    def build_packet(self, data):
+        # Add random padding for hardening (0 to 32 bytes)
+        padding_len = random.randint(0, 32)
+        padding = os.urandom(padding_len)
+        payload = data + padding
+        
+        # Calculate lengths
+        ip_total_len = 20 + 20 + len(payload)
+        
+        # IP Header
+        ip_header = struct.pack('!BBHHHBBH4s4s',
+            0x45, 0, ip_total_len, random.randint(1, 65535), 0x4000, 64, socket.IPPROTO_TCP, 0, self.src_ip, self.dst_ip)
+        
+        # TCP Header
+        flags = 0x18  # ACK + PSH by default
+        # Randomly vary flags slightly for hardening
+        if random.random() < 0.1: flags = 0x10 # Just ACK
+        
+        tcp_header = struct.pack('!HHIIBBHHH',
+            self.src_port, self.dst_port, random.randint(1024, 4294967295), 
+            random.randint(1024, 4294967295), 0x50, flags, 8192, 0, 0)
+        
+        if self.is_windows and self.local_mac:
+            # Ethernet Header for Windows L2 socket
+            eth_header = self.gateway_mac + self.local_mac + b'\x08\x00'
+            return eth_header + ip_header + tcp_header + payload
+        
+        return ip_header + tcp_header + payload
+
+packet_builder = FastPacketBuilder()
 
 def send_to_violated_TCP(binary_data):
-    new_pkt = basepkt.copy()
-    new_pkt[TCP].seq = random.randint(1024,1048576)
-    new_pkt[TCP].ack = random.randint(1024,1048576)
-    new_pkt[TCP].load = binary_data
-    skt.send(new_pkt)
+    try:
+        raw_packet = packet_builder.build_packet(binary_data)
+        skt.send(raw_packet)
+    except Exception as e:
+        logger.error(f"Error sending packet: {e}")
 
 
 async def forward_quic_to_vio(protocol):

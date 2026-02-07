@@ -3573,10 +3573,14 @@ show_logs() {
 
     if command -v journalctl &>/dev/null && [ -d /run/systemd/system ]; then
         journalctl -u paqctl.service -f --no-pager -n 50
-    elif [ -f /var/log/paqctl.log ]; then
+    elif [ -f "/var/log/paqctl.log" ]; then
         tail -f -n 50 /var/log/paqctl.log
+    elif [ -f "$GFK_DIR/gfk.log" ]; then
+        tail -f -n 50 "$GFK_DIR/gfk.log"
+    elif [ -f "$GFK_DIR/gfk_server.log" ]; then
+        tail -f -n 50 "$GFK_DIR/gfk_server.log"
     else
-        log_warn "No logs found. Is paqet running?"
+        log_warn "No logs found. Is the service running?"
     fi
 
     # Restore default trap
@@ -6700,6 +6704,7 @@ show_menu() {
             echo "  1. View status"
             echo "  2. View logs"
             echo "  3. Health check"
+            echo -e "  m. ${YELLOW}Monitor Real-time (GFK)${NC}"
             echo ""
 
             # Paqet controls
@@ -6753,6 +6758,19 @@ show_menu() {
             1) show_status; read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true; redraw=true ;;
             2) show_logs; redraw=true ;;
             3) health_check; read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true; redraw=true ;;
+            m|M)
+                if [ "$gfk_installed" = true ]; then
+                    if [ "$ROLE" = "server" ]; then
+                        python3 "$GFK_DIR/monitor.py" server
+                    else
+                        python3 "$GFK_DIR/monitor.py"
+                    fi
+                else
+                    echo -e "  ${YELLOW}GFK not installed${NC}"
+                    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+                fi
+                redraw=true
+                ;;
             p|P)
                 if [ "$paqet_installed" = true ]; then
                     if is_paqet_running; then
