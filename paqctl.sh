@@ -574,16 +574,27 @@ run_config_wizard() {
     echo -e "${BOLD}Select backend:${NC}"
     echo "  1. paqet       (Go/KCP, built-in SOCKS5, single binary)"
     echo "  2. gfw-knocker (Python/QUIC, port forwarding + microsocks)"
+    echo "  3. Config no iran (Multi-tunnel, standalone server/client)"
     echo ""
     local backend_choice
-    read -p "  Enter choice [1/2]: " backend_choice < /dev/tty || true
+    read -p "  Enter choice [1/3]: " backend_choice < /dev/tty || true
     case "$backend_choice" in
         2) BACKEND="gfw-knocker" ;;
+        3) BACKEND="paqet-multi" ;;
         *) BACKEND="paqet" ;;
     esac
     echo ""
     log_info "Selected backend: $BACKEND"
     echo ""
+
+    if [ "$BACKEND" = "paqet-multi" ]; then
+        # Multi-tunnel backend handles its own menu and logic
+        _wizard_paqet_multi
+        save_settings
+        return
+    fi
+
+    # Role selection for other backends
 
     # Role selection
     echo -e "${BOLD}Select role:${NC}"
@@ -6640,16 +6651,13 @@ show_connection_info() {
 #═══════════════════════════════════════════════════════════════════════
 
 show_menu() {
-    # Auto-fix systemd service if in failed state
-    if command -v systemctl &>/dev/null && [ -d /run/systemd/system ]; then
-        local svc_state=$(systemctl is-active paqctl.service 2>/dev/null)
-        if [ "$svc_state" = "failed" ]; then
-            systemctl reset-failed paqctl.service 2>/dev/null || true
-        fi
-    fi
-
     # Reload settings
     _load_settings
+
+    if [ "$BACKEND" = "paqet-multi" ]; then
+        _menu_paqet_multi
+        return
+    fi
 
     local paqet_installed=false
     local gfk_installed=false
@@ -7228,7 +7236,482 @@ main() {
     fi
 }
 
-# Handle command line arguments
+#═══════════════════════════════════════════════════════════════════════
+# Multi-Tunnel Backend (Backend 3) - paqet-multi
+#═══════════════════════════════════════════════════════════════════════
+
+_wizard_paqet_multi() {
+    echo ""
+    log_info "Redirecting to Multi-Tunnel Setup..."
+    sleep 1
+    # For Backend 3, we jump straight to its main menu which handles setup
+    _menu_paqet_multi
+}
+
+_menu_paqet_multi() {
+    while true; do
+        clear
+        echo -e "${MAGENTA}"
+        echo "╔══════════════════════════════════════════════════════════════╗"
+        echo "║                                                              ║"
+        echo "║     ██████╗  █████╗  ██████╗ ███████╗████████╗               ║"
+        echo "║     ██╔══██╗██╔══██╗██╔═══██╗██╔════╝╚══██╔══╝               ║"
+        echo "║     ██████╔╝███████║██║   ██║█████╗     ██║                  ║"
+        echo "║     ██╔═══╝ ██╔══██║██║▄▄ ██║██╔══╝     ██║                  ║"
+        echo "║     ██║     ██║  ██║╚██████╔╝███████╗   ██║                  ║"
+        echo "║     ╚═╝     ╚═╝  ╚═╝ ╚══▀▀═╝ ╚══════╝   ╚═╝                  ║"
+        echo "║                                                              ║"
+        echo "║          Multi-Tunnel Manager (Advanced Mode)                ║"
+        echo "╚══════════════════════════════════════════════════════════════╝"
+        echo -e "${NC}"
+
+        echo -e "${YELLOW}Select option:${NC}"
+        echo ""
+        echo -e "  ${GREEN}── Setup ──${NC}"
+        echo -e "  ${CYAN}1)${NC} Setup Server B (Abroad - VPN server)"
+        echo -e "  ${CYAN}2)${NC} Setup Server A (Iran - entry point)"
+        echo ""
+        echo -e "  ${GREEN}── Management ──${NC}"
+        echo -e "  ${CYAN}3)${NC} Check Status"
+        echo -e "  ${CYAN}4)${NC} View Configuration"
+        echo -e "  ${CYAN}5)${NC} Edit Configuration"
+        echo -e "  ${CYAN}6)${NC} Manage Tunnels (add/remove/restart)"
+        echo -e "  ${CYAN}7)${NC} Test Connection"
+        echo ""
+        echo -e "  ${GREEN}── Maintenance ──${NC}"
+        echo -e "  ${CYAN}8)${NC} Check for Updates"
+        echo -e "  ${CYAN}9)${NC} Show Port Defaults"
+        echo -e "  ${CYAN}u)${NC} Uninstall paqet"
+        echo ""
+        echo -e "  ${GREEN}── Script ──${NC}"
+        echo -e "  ${CYAN}i)${NC} Install as 'paqet-tunnel' command"
+        echo -e "  ${CYAN}r)${NC} Remove paqet-tunnel command"
+        echo -e "  ${CYAN}0)${NC} Back to Main Menu"
+        echo ""
+        read -p "Choice [1-9, u, i, r, 0]: " choice < /dev/tty || choice=0
+        
+        case $choice in
+            1) _multi_setup_server_b ;;
+            2) _multi_setup_server_a ;;
+            3) _multi_check_status ;;
+            4) _multi_view_config ;;
+            5) _multi_edit_config ;;
+            6) _multi_manage_tunnels ;;
+            7) _multi_test_connection ;;
+            8) _multi_check_updates ;;
+            9) _multi_show_ports ;;
+            [Uu]) _multi_uninstall ;;
+            [Ii]) _multi_install_command ;;
+            [Rr]) _multi_uninstall_command ;;
+            0) return ;;
+            *) log_error "Invalid choice" ; sleep 1 ;;
+        esac
+    done
+}
+
+_multi_get_all_configs() {
+    if [ -f "/opt/paqet/config.yaml" ]; then
+        echo "/opt/paqet/config.yaml"
+    fi
+    for f in /opt/paqet/config-*.yaml; do
+        [ -f "$f" ] && echo "$f"
+    done
+}
+
+_multi_get_tunnel_name() {
+    local config_path="$1"
+    local filename=$(basename "$config_path")
+    if [ "$filename" = "config.yaml" ]; then
+        echo "default"
+    else
+        echo "$filename" | sed 's/^config-//; s/\.yaml$//'
+    fi
+}
+
+_multi_get_tunnel_service() {
+    local config_path="$1"
+    local name=$(_multi_get_tunnel_name "$config_path")
+    if [ "$name" = "default" ]; then
+        echo "paqet"
+    else
+        echo "paqet-${name}"
+    fi
+}
+
+_multi_list_tunnels() {
+    local configs=$(_multi_get_all_configs)
+    if [ -z "$configs" ]; then
+        log_warn "No tunnels configured"
+        return 1
+    fi
+    local idx=0
+    while IFS= read -r config_file; do
+        [ -z "$config_file" ] && continue
+        idx=$((idx + 1))
+        local name=$(_multi_get_tunnel_name "$config_file")
+        local service=$(_multi_get_tunnel_service "$config_file")
+        local role=$(grep "^role:" "$config_file" 2>/dev/null | awk '{print $2}' | tr -d '"')
+        local status="${RED}Stopped${NC}"
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            status="${GREEN}Running${NC}"
+        fi
+        echo -ne "  ${CYAN}${idx})${NC} ${YELLOW}${name}${NC} [${status}] (${role})"
+        if [ "$role" = "client" ]; then
+            local server_addr=$(grep -A1 "^server:" "$config_file" 2>/dev/null | grep "addr:" | awk '{print $2}' | tr -d '"')
+            echo " -> ${server_addr}"
+        else
+            echo ""
+        fi
+    done <<< "$configs"
+}
+
+_multi_select_tunnel() {
+    local configs=$(_multi_get_all_configs)
+    local count=$(echo "$configs" | grep -v "^$" | wc -l)
+    if [ "$count" -eq 0 ]; then
+        log_error "No tunnels configured"
+        return 1
+    fi
+    if [ "$count" -eq 1 ]; then
+        SELECTED_CONFIG=$(echo "$configs" | head -1)
+        return 0
+    fi
+    echo -e "${YELLOW}Select tunnel:${NC}"
+    _multi_list_tunnels
+    read -p "Choice: " tunnel_choice < /dev/tty
+    if ! [[ "$tunnel_choice" =~ ^[0-9]+$ ]] || [ "$tunnel_choice" -lt 1 ] || [ "$tunnel_choice" -gt "$count" ]; then
+        log_error "Invalid choice"
+        return 1
+    fi
+    SELECTED_CONFIG=$(echo "$configs" | sed -n "${tunnel_choice}p")
+    return 0
+}
+
+_multi_setup_server_b() {
+    clear
+    echo -e "${GREEN}Setting up Server B (Abroad - VPN Server)${NC}"
+    echo -e "${CYAN}This server runs your V2Ray/X-UI and the paqet server${NC}"
+    echo ""
+    mkdir -p "/opt/paqet"
+    
+    detect_network
+    local interface="${IFACE:-eth0}"
+    local local_ip="${LOCAL_IP:-$DETECTED_IP}"
+    local gateway_mac="${GW_MAC:-$DETECTED_GW_MAC}"
+    
+    echo -e "${BOLD}1. Network Configuration${NC}"
+    read -p "  Interface [$interface]: " input < /dev/tty
+    interface="${input:-$interface}"
+    read -p "  Local IP [$local_ip]: " input < /dev/tty
+    local_ip="${input:-$local_ip}"
+    read -p "  Gateway MAC [$gateway_mac]: " input < /dev/tty
+    gateway_mac="${input:-$gateway_mac}"
+
+    echo -e "\n${BOLD}2. Tunnel Settings${NC}"
+    read -p "  paqet listen port [8888]: " input < /dev/tty
+    local paqet_port="${input:-8888}"
+    read -p "  V2Ray inbound ports (e.g. 443,8443) [443]: " input < /dev/tty
+    local inbound_ports="${input:-443}"
+    
+    local secret_key=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16)
+    read -p "  Secret key [$secret_key]: " input < /dev/tty
+    secret_key="${input:-$secret_key}"
+
+    log_info "Downloading paqet..."
+    download_paqet "$PAQET_VERSION_PINNED"
+    cp "$INSTALL_DIR/bin/paqet" "/opt/paqet/paqet"
+    chmod +x "/opt/paqet/paqet"
+
+    log_info "Creating configuration..."
+    cat > "/opt/paqet/config.yaml" << EOF
+role: "server"
+log:
+  level: "info"
+listen:
+  addr: ":${paqet_port}"
+network:
+  interface: "${interface}"
+  ipv4:
+    addr: "${local_ip}:${paqet_port}"
+    router_mac: "${gateway_mac}"
+  tcp:
+    local_flag: ["PA"]
+transport:
+  protocol: "kcp"
+  conn: 1
+  kcp:
+    mode: "fast"
+    key: "${secret_key}"
+    mtu: 1350
+EOF
+
+    log_info "Setting up systemd service..."
+    cat > "/etc/systemd/system/paqet.service" << EOF
+[Unit]
+Description=paqet Raw Packet Tunnel (Server)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/paqet
+ExecStart=/opt/paqet/paqet -config /opt/paqet/config.yaml
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable --now paqet
+    
+    # Apply firewall rules if possible
+    if command -v iptables &>/dev/null; then
+        apply_iptables_rules "$paqet_port"
+    fi
+
+    log_success "Server B setup complete!"
+    echo -e "  ${YELLOW}Secret Key:${NC} ${CYAN}$secret_key${NC}"
+    echo -e "  ${YELLOW}paqet Port:${NC} ${CYAN}$paqet_port${NC}"
+    echo ""
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_setup_server_a() {
+    clear
+    echo -e "${GREEN}Setting up Server A (Entry Point)${NC}"
+    echo ""
+    mkdir -p "/opt/paqet"
+    
+    _multi_run_iran_optimizations
+
+    read -p "Enter tunnel name (e.g. usa): " tunnel_name < /dev/tty
+    if [ -z "$tunnel_name" ]; then log_error "Name required"; return; fi
+    
+    read -p "Server B Public IP: " server_b_ip < /dev/tty
+    read -p "paqet port on Server B [8888]: " input < /dev/tty
+    local server_b_port="${input:-8888}"
+    read -p "Secret key: " secret_key < /dev/tty
+    
+    detect_network
+    local interface="${IFACE:-eth0}"
+    local local_ip="${LOCAL_IP:-$DETECTED_IP}"
+    local gateway_mac="${GW_MAC:-$DETECTED_GW_MAC}"
+
+    read -p "Interface [$interface]: " input < /dev/tty
+    interface="${input:-$interface}"
+    read -p "Forward ports (e.g. 443,8443) [443]: " input < /dev/tty
+    local forward_ports="${input:-443}"
+
+    log_info "Downloading paqet..."
+    download_paqet "$PAQET_VERSION_PINNED"
+    cp "$INSTALL_DIR/bin/paqet" "/opt/paqet/paqet"
+    chmod +x "/opt/paqet/paqet"
+
+    local forward_config=""
+    IFS=',' read -ra PORTS <<< "$forward_ports"
+    for p in "${PORTS[@]}"; do
+        p=$(echo "$p" | tr -d ' ')
+        forward_config="${forward_config}\n  - listen: \"0.0.0.0:${p}\"\n    target: \"127.0.0.1:${p}\"\n    protocol: \"tcp\""
+    done
+
+    log_info "Creating configuration..."
+    cat > "/opt/paqet/config-${tunnel_name}.yaml" << EOF
+role: "client"
+log:
+  level: "info"
+forward:${forward_config}
+network:
+  interface: "${interface}"
+  ipv4:
+    addr: "${local_ip}:0"
+    router_mac: "${gateway_mac}"
+  tcp:
+    local_flag: ["PA"]
+    remote_flag: ["PA"]
+server:
+  addr: "${server_b_ip}:${server_b_port}"
+transport:
+  protocol: "kcp"
+  conn: 1
+  kcp:
+    mode: "fast"
+    key: "${secret_key}"
+    mtu: 1350
+EOF
+
+    log_info "Setting up systemd service..."
+    cat > "/etc/systemd/system/paqet-${tunnel_name}.service" << EOF
+[Unit]
+Description=paqet Raw Packet Tunnel (Client: ${tunnel_name})
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/paqet
+ExecStart=/opt/paqet/paqet -config /opt/paqet/config-${tunnel_name}.yaml
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable --now "paqet-${tunnel_name}"
+    
+    log_success "Server A tunnel '${tunnel_name}' setup complete!"
+    echo ""
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_run_iran_optimizations() {
+    echo -e "${CYAN}Run Iran Network Optimization? (y/n):${NC} "
+    read -p "> " choice < /dev/tty
+    if [[ "$choice" =~ ^[Yy]$ ]]; then
+        log_info "Running DNS Finder..."
+        bash <(curl -Ls https://github.com/alinezamifar/IranDNSFinder/raw/refs/heads/main/dns.sh)
+        log_info "Running Mirror Selector..."
+        bash <(curl -Ls https://github.com/alinezamifar/DetectUbuntuMirror/raw/refs/heads/main/DUM.sh)
+    fi
+}
+
+_multi_check_status() {
+    clear
+    echo -e "${YELLOW}paqet Multi-Tunnel Status${NC}"
+    echo ""
+    local configs=$(_multi_get_all_configs)
+    if [ -z "$configs" ]; then
+        log_error "No tunnels found"
+    else
+        while IFS= read -r cfg; do
+            [ -z "$cfg" ] && continue
+            local name=$(_multi_get_tunnel_name "$cfg")
+            local service=$(_multi_get_tunnel_service "$cfg")
+            echo -e "── Tunnel: ${CYAN}${name}${NC} ──"
+            systemctl status "$service" --no-pager | head -n 15
+            echo ""
+        done <<< "$configs"
+    fi
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_view_config() {
+    if _multi_select_tunnel; then
+        clear
+        echo -e "${YELLOW}Configuration for: ${CYAN}${SELECTED_CONFIG}${NC}"
+        echo "--------------------------------"
+        cat "$SELECTED_CONFIG"
+        echo "--------------------------------"
+    fi
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_edit_config() {
+    if _multi_select_tunnel; then
+        nano "$SELECTED_CONFIG" || vi "$SELECTED_CONFIG"
+        local svc=$(_multi_get_tunnel_service "$SELECTED_CONFIG")
+        log_info "Restarting $svc..."
+        systemctl restart "$svc"
+    fi
+}
+
+_multi_manage_tunnels() {
+    while true; do
+        clear
+        echo -e "${YELLOW}Manage Tunnels${NC}"
+        echo ""
+        _multi_list_tunnels
+        echo ""
+        echo "  a) Add New Tunnel"
+        echo "  r) Remove Tunnel"
+        echo "  s) Stop Tunnel"
+        echo "  t) Start Tunnel"
+        echo "  0) Back"
+        echo ""
+        read -p "Choice: " subchoice < /dev/tty
+        case $subchoice in
+            a) _multi_setup_server_a ;;
+            r)
+                if _multi_select_tunnel; then
+                    local svc=$(_multi_get_tunnel_service "$SELECTED_CONFIG")
+                    systemctl disable --now "$svc"
+                    rm "/etc/systemd/system/${svc}.service"
+                    rm "$SELECTED_CONFIG"
+                    systemctl daemon-reload
+                    log_success "Tunnel removed"
+                fi
+                ;;
+            s)
+                if _multi_select_tunnel; then
+                    systemctl stop $(_multi_get_tunnel_service "$SELECTED_CONFIG")
+                fi
+                ;;
+            t)
+                if _multi_select_tunnel; then
+                    systemctl start $(_multi_get_tunnel_service "$SELECTED_CONFIG")
+                fi
+                ;;
+            0) return ;;
+        esac
+        sleep 1
+    done
+}
+
+_multi_test_connection() {
+    log_info "Testing connectivity..."
+    ping -c 3 8.8.8.8
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_check_updates() {
+    log_info "Checking for updates..."
+    # Reuse existing update logic
+    _check_updates
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_show_ports() {
+    echo -e "${CYAN}Default Ports:${NC}"
+    echo "  paqet: 8888"
+    echo "  V2Ray: 4443"
+    read -p "Press Enter to continue..." < /dev/tty
+}
+
+_multi_uninstall() {
+    read -p "Are you sure you want to uninstall ALL paqet-multi tunnels? (y/N): " choice < /dev/tty
+    if [[ "$choice" =~ ^[Yy]$ ]]; then
+        local configs=$(_multi_get_all_configs)
+        while IFS= read -r cfg; do
+            [ -z "$cfg" ] && continue
+            local svc=$(_multi_get_tunnel_service "$cfg")
+            systemctl disable --now "$svc" 2>/dev/null
+            rm "/etc/systemd/system/${svc}.service" 2>/dev/null
+            rm "$cfg"
+        done <<< "$configs"
+        rm -rf "/opt/paqet"
+        systemctl daemon-reload
+        log_success "paqet-multi uninstalled"
+    fi
+}
+
+_multi_install_command() {
+    ln -sf "/usr/local/bin/paqctl" "/usr/local/bin/paqet-tunnel"
+    log_success "Installed as 'paqet-tunnel' command"
+    sleep 1
+}
+
+_multi_uninstall_command() {
+    rm -f "/usr/local/bin/paqet-tunnel"
+    log_success "Command removed"
+    sleep 1
+}
+
+# --- Argument handling ---
 case "${1:-}" in
     menu)
         check_root
