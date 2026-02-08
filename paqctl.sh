@@ -32,7 +32,7 @@ fi
 VERSION="1.0.0"
 
 # Pinned versions for stability (update these after testing new releases)
-PAQET_VERSION_PINNED="v1.0.0-alpha.15"
+PAQET_VERSION_PINNED="latest"
 XRAY_VERSION_PINNED="v26.2.4"
 GFK_VERSION_PINNED="v1.0.0"
 
@@ -381,6 +381,18 @@ get_latest_version() {
 
 download_paqet() {
     local version="$1"
+    
+    # Resolve "latest" version if requested
+    if [ "$version" = "latest" ] || [ -z "$version" ]; then
+        log_info "Detecting latest paqet version..."
+        version=$(get_latest_version)
+        if [ -z "$version" ]; then
+            log_error "Could not detect latest version and no version pinned. Aborting."
+            return 1
+        fi
+        log_info "Latest version detected: $version"
+    fi
+
     local arch
     arch=$(detect_arch)
     local os_name="linux"
