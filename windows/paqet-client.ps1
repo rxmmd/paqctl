@@ -322,7 +322,7 @@ function Install-Paqet {
         return $true
     }
 
-    $zipUrl = "https://github.com/hanselime/paqet/releases/download/$PaqetVersion/paqet-windows-amd64-$PaqetVersion.zip"
+    $zipUrl = "https://github.com/rxmmd/paqet/releases/download/$PaqetVersion/paqet-windows-amd64-$PaqetVersion.zip"
     $zipFile = "$env:TEMP\paqet.zip"
 
     Write-Info "Downloading paqet $PaqetVersion..."
@@ -811,7 +811,7 @@ function Update-Paqet {
     # Query GitHub API for latest release
     Write-Info "Querying GitHub for latest release..."
     try {
-        $apiUrl = "https://api.github.com/repos/hanselime/paqet/releases/latest"
+        $apiUrl = "https://api.github.com/repos/rxmmd/paqet/releases/latest"
         $response = Invoke-RestMethod -Uri $apiUrl -TimeoutSec 30
         $latestVersion = $response.tag_name
     } catch {
@@ -848,7 +848,7 @@ function Update-Paqet {
     }
 
     # Download new version
-    $zipUrl = "https://github.com/hanselime/paqet/releases/download/$latestVersion/paqet-windows-amd64-$latestVersion.zip"
+    $zipUrl = "https://github.com/rxmmd/paqet/releases/download/$latestVersion/paqet-windows-amd64-$latestVersion.zip"
     $zipFile = "$env:TEMP\paqet-update.zip"
     $extractDir = "$env:TEMP\paqet-update"
 
