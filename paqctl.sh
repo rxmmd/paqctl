@@ -1586,7 +1586,7 @@ download_gfk() {
         fi
     done
     # Download client scripts from gfk/client/
-    local client_files="mainclient.py quic_client.py vio_client.py"
+    local client_files="mainclient.py quic_client.py vio_client.py monitor.py"
     for f in $client_files; do
         if ! curl -sL "$GFK_RAW_URL/client/$f" -o "$GFK_DIR/$f"; then
             log_error "Failed to download $f"
@@ -1777,9 +1777,9 @@ setup_service() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_server.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_client.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
     fi
 
     # If both backends are installed, create a combined service
@@ -2607,7 +2607,7 @@ download_gfk() {
         curl -sL "$GFK_RAW_URL/server/$f" -o "$GFK_DIR/$f" || { log_error "Failed to download $f"; return 1; }
     done
     # Download client scripts from gfk/client/
-    for f in mainclient.py quic_client.py vio_client.py; do
+    for f in mainclient.py quic_client.py vio_client.py monitor.py; do
         curl -sL "$GFK_RAW_URL/client/$f" -o "$GFK_DIR/$f" || { log_error "Failed to download $f"; return 1; }
     done
     chmod 600 "$GFK_DIR"/*.py
@@ -2722,9 +2722,9 @@ is_running() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_server.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_client.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
     fi
 
     # If both backends installed, return true if EITHER is running
@@ -3056,9 +3056,9 @@ start_paqet() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_server.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_client.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
     fi
 
     # If both backends installed, start both
@@ -3128,9 +3128,9 @@ stop_paqet() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_server.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_client.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
     fi
 
     # If both backends installed, stop both
@@ -6581,9 +6581,9 @@ show_connection_info() {
     local gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_server.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_client.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
     fi
 
     if [ "$paqet_installed" = true ]; then
@@ -6661,9 +6661,9 @@ show_menu() {
             gfk_installed=false
             [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
             if [ "$ROLE" = "server" ]; then
-                [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_server.py" ] && gfk_installed=true
+                [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
             else
-                [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/quic_client.py" ] && gfk_installed=true
+                [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
             fi
 
             clear
