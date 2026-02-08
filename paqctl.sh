@@ -37,7 +37,7 @@ PAQET_VERSION_STABLE="v1.0.0-alpha.15"
 XRAY_VERSION_PINNED="v26.2.4"
 GFK_VERSION_PINNED="v1.0.0"
 
-PAQET_REPO="rxmmd/paqet"
+PAQET_REPO="hanselime/paqet"
 PAQET_API_URL="https://api.github.com/repos/${PAQET_REPO}/releases/latest"
 INSTALL_DIR="${INSTALL_DIR:-/opt/paqctl}"
 BACKUP_DIR="$INSTALL_DIR/backups"
