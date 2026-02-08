@@ -1777,9 +1777,9 @@ setup_service() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; } && gfk_installed=true
     fi
 
     # If both backends are installed, create a combined service
@@ -2722,9 +2722,9 @@ is_running() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; } && gfk_installed=true
     fi
 
     # If both backends installed, return true if EITHER is running
@@ -3056,9 +3056,9 @@ start_paqet() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; } && gfk_installed=true
     fi
 
     # If both backends installed, start both
@@ -3128,9 +3128,9 @@ stop_paqet() {
     local paqet_installed=false gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; } && gfk_installed=true
     fi
 
     # If both backends installed, stop both
@@ -3602,7 +3602,8 @@ health_check() {
 
     if [ "$BACKEND" = "gfw-knocker" ]; then
         # 1. Python scripts exist
-        if [ -f "$GFK_DIR/mainserver.py" ] && [ -f "$GFK_DIR/mainclient.py" ]; then
+        if { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && \
+           { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; }; then
             echo -e "  ${GREEN}✓${NC} GFW-knocker scripts found"
         else
             echo -e "  ${RED}✗${NC} GFW-knocker scripts missing from $GFK_DIR"
@@ -6581,9 +6582,9 @@ show_connection_info() {
     local gfk_installed=false
     [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
     if [ "$ROLE" = "server" ]; then
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && gfk_installed=true
     else
-        [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
+        [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; } && gfk_installed=true
     fi
 
     if [ "$paqet_installed" = true ]; then
@@ -6661,9 +6662,9 @@ show_menu() {
             gfk_installed=false
             [ -f "$INSTALL_DIR/bin/paqet" ] && paqet_installed=true
             if [ "$ROLE" = "server" ]; then
-                [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainserver.py" ] && gfk_installed=true
+                [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainserver.py" ] || [ -f "$GFK_DIR/quic_server.py" ]; } && gfk_installed=true
             else
-                [ -d "$GFK_DIR" ] && [ -f "$GFK_DIR/mainclient.py" ] && gfk_installed=true
+                [ -d "$GFK_DIR" ] && { [ -f "$GFK_DIR/mainclient.py" ] || [ -f "$GFK_DIR/quic_client.py" ]; } && gfk_installed=true
             fi
 
             clear
@@ -6760,10 +6761,15 @@ show_menu() {
             3) health_check; read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true; redraw=true ;;
             m|M)
                 if [ "$gfk_installed" = true ]; then
-                    if [ "$ROLE" = "server" ]; then
-                        python3 "$GFK_DIR/monitor.py" server
+                    if [ ! -f "$GFK_DIR/monitor.py" ]; then
+                        echo -e "  ${RED}Monitoring script (monitor.py) missing.${NC}"
+                        echo -e "  ${YELLOW}Please update/reinstall GFK components to use this feature.${NC}"
                     else
-                        python3 "$GFK_DIR/monitor.py"
+                        if [ "$ROLE" = "server" ]; then
+                            python3 "$GFK_DIR/monitor.py" server
+                        else
+                            python3 "$GFK_DIR/monitor.py"
+                        fi
                     fi
                 else
                     echo -e "  ${YELLOW}GFK not installed${NC}"
