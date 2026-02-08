@@ -486,7 +486,7 @@ function Install-Gfk {
 
     # Copy bundled GFK scripts or download from GitHub
     Write-Info "Setting up GFW-knocker scripts..."
-    $GfkGitHubBase = "https://raw.githubusercontent.com/SamNet-dev/paqctl/main/gfk/client"
+    $GfkGitHubBase = "https://raw.githubusercontent.com/rxmmd/paqctl/main/gfk/client"
     foreach ($file in $GfkFiles) {
         $dest = "$GfkDir\$file"
         $src = if ($GfkLocalDir) { "$GfkLocalDir\$file" } else { $null }

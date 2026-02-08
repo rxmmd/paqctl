@@ -12,11 +12,11 @@
 # ║  * Auto-start on boot via systemd/OpenRC/SysVinit                 ║
 # ║  * Easy management via CLI or interactive menu                    ║
 # ║                                                                   ║
-# ║  Paqet: https://github.com/SamNet-dev/paqctl                       ║
+# ║  Paqet: https://github.com/rxmmd/paqctl                       ║
 # ╚═══════════════════════════════════════════════════════════════════╝
 #
 # Usage:
-# curl -sL https://raw.githubusercontent.com/SamNet-dev/paqctl/main/paqctl.sh | sudo bash
+# curl -sL https://raw.githubusercontent.com/rxmmd/paqctl/main/paqctl.sh | sudo bash
 #
 # Or: wget paqctl.sh && sudo bash paqctl.sh
 #
@@ -40,7 +40,7 @@ PAQET_REPO="hanselime/paqet"
 PAQET_API_URL="https://api.github.com/repos/${PAQET_REPO}/releases/latest"
 INSTALL_DIR="${INSTALL_DIR:-/opt/paqctl}"
 BACKUP_DIR="$INSTALL_DIR/backups"
-GFK_REPO="SamNet-dev/paqctl"
+GFK_REPO="rxmmd/paqctl"
 GFK_BRANCH="main"
 GFK_RAW_URL="https://raw.githubusercontent.com/${GFK_REPO}/${GFK_BRANCH}/gfk"
 GFK_DIR="$INSTALL_DIR/gfk"
@@ -2107,7 +2107,7 @@ create_management_script() {
 #!/bin/bash
 #
 # paqctl - Paqet Manager
-# https://github.com/SamNet-dev/paqctl
+# https://github.com/rxmmd/paqctl
 #
 
 VERSION="1.0.0"
@@ -2121,7 +2121,7 @@ INSTALL_DIR="REPLACE_ME_INSTALL_DIR"
 BACKUP_DIR="$INSTALL_DIR/backups"
 PAQET_REPO="hanselime/paqet"
 PAQET_API_URL="https://api.github.com/repos/${PAQET_REPO}/releases/latest"
-GFK_REPO="SamNet-dev/paqctl"
+GFK_REPO="rxmmd/paqctl"
 GFK_BRANCH="main"
 GFK_RAW_URL="https://raw.githubusercontent.com/${GFK_REPO}/${GFK_BRANCH}/gfk"
 GFK_DIR="$INSTALL_DIR/gfk"
@@ -4166,7 +4166,7 @@ rollback_paqet() {
 }
 
 update_management_script() {
-    local update_url="https://raw.githubusercontent.com/SamNet-dev/paqctl/main/paqctl.sh"
+    local update_url="https://raw.githubusercontent.com/rxmmd/paqctl/main/paqctl.sh"
     local tmp_script
     tmp_script=$(mktemp "/tmp/paqctl-update-XXXXXXXX.sh")
 
@@ -6171,7 +6171,7 @@ show_help() {
     echo "  version     Show version info"
     echo "  help        Show this help"
     echo ""
-    echo -e "${BOLD}Paqet:${NC} https://github.com/SamNet-dev/paqctl"
+    echo -e "${BOLD}Paqet:${NC} https://github.com/rxmmd/paqctl"
     echo ""
 }
 
@@ -6193,7 +6193,7 @@ show_version() {
         fi
     fi
     echo ""
-    echo -e "  ${DIM}paqctl by SamNet-dev: https://github.com/SamNet-dev/paqctl${NC}"
+    echo -e "  ${DIM}paqctl by SamNet-dev: https://github.com/rxmmd/paqctl${NC}"
     echo ""
 }
 
@@ -6368,7 +6368,7 @@ show_info_menu() {
                 echo "     destination on the open internet."
                 echo ""
                 echo -e "  ${DIM}Technical stack: Go, gopacket, libpcap, KCP, smux, AES${NC}"
-                echo -e "  ${DIM}Project: https://github.com/SamNet-dev/paqctl${NC}"
+                echo -e "  ${DIM}Project: https://github.com/rxmmd/paqctl${NC}"
                 echo ""
                 read -n 1 -s -r -p "  Press any key..." < /dev/tty || true
                 redraw=true
@@ -6521,7 +6521,7 @@ show_info_menu() {
                 echo -e "  ${CYAN}── Paqet ──${NC}"
                 echo ""
                 echo -e "  ${BOLD}Creator:${NC}    hanselime"
-                echo -e "  ${BOLD}Repository:${NC} https://github.com/SamNet-dev/paqctl"
+                echo -e "  ${BOLD}Repository:${NC} https://github.com/rxmmd/paqctl"
                 echo -e "  ${BOLD}License:${NC}    MIT"
                 echo -e "  ${BOLD}Language:${NC}   Go"
                 echo -e "  ${BOLD}Contact:${NC}    Signal @hanselime.11"
@@ -6542,7 +6542,7 @@ show_info_menu() {
                 echo -e "  ${CYAN}── paqctl Management Tool ──${NC}"
                 echo ""
                 echo -e "  ${BOLD}Built by:${NC}   SamNet-dev"
-                echo -e "  ${BOLD}Repository:${NC} https://github.com/SamNet-dev/paqctl"
+                echo -e "  ${BOLD}Repository:${NC} https://github.com/rxmmd/paqctl"
                 echo -e "  ${BOLD}License:${NC}    MIT"
                 echo ""
                 echo "  paqctl provides one-click installation, configuration,"
