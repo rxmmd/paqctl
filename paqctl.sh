@@ -33,6 +33,7 @@ VERSION="1.0.0"
 
 # Pinned versions for stability (update these after testing new releases)
 PAQET_VERSION_PINNED="latest"
+PAQET_VERSION_STABLE="v1.0.0-alpha.15"
 XRAY_VERSION_PINNED="v26.2.4"
 GFK_VERSION_PINNED="v1.0.0"
 
@@ -339,15 +340,18 @@ _curl_with_retry() {
     local delay=2
     local response=""
     while [ $attempt -le $max_attempts ]; do
-        response=$(curl -s --max-time 15 "$url" 2>/dev/null)
+        # Use || true to prevent set -e from exiting on curl error
+        response=$(curl -s --max-time 15 "$url" 2>/dev/null || echo "")
         if [ -n "$response" ]; then
-            # Check for rate limit response
-            if echo "$response" | grep -q '"message".*rate limit'; then
-                log_warn "GitHub API rate limited, waiting ${delay}s (attempt $attempt/$max_attempts)"
-                sleep $delay
-                delay=$((delay * 2))
-                attempt=$((attempt + 1))
-                continue
+            # Check for GitHub API error messages (like rate limiting)
+            if echo "$response" | grep -q '"message"'; then
+                if echo "$response" | grep -q 'rate limit'; then
+                    log_warn "GitHub API rate limited, waiting ${delay}s (attempt $attempt/$max_attempts)"
+                    sleep $delay
+                    delay=$((delay * 2))
+                    attempt=$((attempt + 1))
+                    continue
+                fi
             fi
             echo "$response"
             return 0
@@ -367,9 +371,10 @@ get_latest_version() {
         return 1
     fi
     local tag
-    tag=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+    # Use || true to prevent pipefail from exiting on grep failure
+    tag=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo "")
     if [ -z "$tag" ]; then
-        log_error "Could not determine latest paqet version"
+        log_error "Could not determine latest paqet version from API response"
         return 1
     fi
     if ! _validate_version_tag "$tag"; then
@@ -385,12 +390,13 @@ download_paqet() {
     # Resolve "latest" version if requested
     if [ "$version" = "latest" ] || [ -z "$version" ]; then
         log_info "Detecting latest paqet version..."
-        version=$(get_latest_version)
+        version=$(get_latest_version || echo "")
         if [ -z "$version" ]; then
-            log_error "Could not detect latest version and no version pinned. Aborting."
-            return 1
+            log_warn "Could not detect latest version. Falling back to stable version: ${PAQET_VERSION_STABLE}"
+            version="${PAQET_VERSION_STABLE}"
+        else
+            log_info "Latest version detected: $version"
         fi
-        log_info "Latest version detected: $version"
     fi
 
     local arch
@@ -3906,7 +3912,8 @@ update_paqet() {
     fi
 
     local latest_tag
-    latest_tag=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+    # Use || echo "" to prevent pipefail from exiting on grep failure
+    latest_tag=$(echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' || echo "")
     if [ -z "$latest_tag" ] || ! _validate_version_tag "$latest_tag"; then
         log_error "Could not determine valid version from GitHub"
         return 1
@@ -3914,7 +3921,7 @@ update_paqet() {
 
     # Extract release date
     local release_date
-    release_date=$(echo "$response" | grep -o '"published_at"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' | cut -dT -f1)
+    release_date=$(echo "$response" | grep -o '"published_at"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"' | cut -dT -f1 || echo "")
 
     # Extract release notes (body field)
     local release_notes=""
@@ -7683,7 +7690,7 @@ _multi_test_connection() {
 _multi_check_updates() {
     log_info "Checking for updates..."
     # Reuse existing update logic
-    _check_updates
+    update_paqet
     read -p "Press Enter to continue..." < /dev/tty
 }
 
